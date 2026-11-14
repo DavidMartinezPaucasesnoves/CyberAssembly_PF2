@@ -1,54 +1,57 @@
 package model.concurrency;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-// Monitor central para controlar la parada de emergencia por sobrecalentamiento
-// y guardar el estado actual de los robots y AGVs para mostrarlo en el dashboard
+// Monitor central que controla la parada de emergencia por sobrecalentamiento
+// y guarda el estado de los robots y AGVs para mostrarlo en el dashboard
 public class SupervisorCentral {
 
-    private boolean alertaSobrecalentamiento = false;
-    private final AtomicInteger totalAlertas = new AtomicInteger(0);
+    private boolean alertaActiva = false;
+    private int totalAlertas = 0;
     private final String[] estadoRobots;
     private final String[] estadoAgvs;
-    private String ultimoEvento = "Planta iniciada correctamente";
+    private String ultimoEvento = "Planta iniciada";
 
-    
     public SupervisorCentral(int numRobots, int numAgvs) {
         this.estadoRobots = new String[numRobots];
         this.estadoAgvs = new String[numAgvs];
 
         for (int i = 0; i < numRobots; i++) {
-            estadoRobots[i] = "Preparado";
+            estadoRobots[i] = "Iniciando";
         }
         for (int i = 0; i < numAgvs; i++) {
-            estadoAgvs[i] = "Preparado";
+            estadoAgvs[i] = "Iniciando";
         }
     }
 
-    // Si hay alerta activa, los robots se quedan esperando con wait()
-    public synchronized void comprobarAlerta(int idRobot) throws InterruptedException {
-        while (alertaSobrecalentamiento) {
+    // Los robots llaman a este metodo antes de cada operacion.
+    // si hay alerta activa, sueltan el monitor y esperan con wait() dentro de un while.
+    public synchronized void verificaEstat(int idRobot) throws InterruptedException {
+        while (alertaActiva) {
             estadoRobots[idRobot] = "PAUSADO (Alerta)";
             wait();
         }
+        estadoRobots[idRobot] = "Activo";
     }
 
-    // Activa la emergencia para detener a los robots
-    public synchronized void activarAlerta(String motivo) {
-        alertaSobrecalentamiento = true;
-        totalAlertas.incrementAndGet();
-        ultimoEvento = "ALERTA: " + motivo;
+
+
+    // Activa la parada de emergencia por sobrecalentamiento
+    public synchronized void activaAlerta() {
+        alertaActiva = true;
+        totalAlertas++;
+        ultimoEvento = "ALERTA: Sobrecalentamiento activado";
     }
 
-    // Desactiva la emergencia y despierta a todos los robots con notifyAll()
-    public synchronized void desactivarAlerta() {
-        alertaSobrecalentamiento = false;
-        ultimoEvento = "Alerta resuelta, robots reanudados";
+    // Desactiva la alerta y despierta a todos los robots con notifyAll()
+    public synchronized void desactivaAlerta() {
+        alertaActiva = false;
+        ultimoEvento = "Alerta resuelta: produccion reanudada";
         notifyAll();
     }
 
+
+    
     public synchronized boolean isAlertaActiva() {
-        return alertaSobrecalentamiento;
+        return alertaActiva;
     }
 
     public synchronized void setEstadoRobot(int idRobot, String estado) {
@@ -75,7 +78,7 @@ public class SupervisorCentral {
         return ultimoEvento;
     }
 
-    public int getTotalAlertas() {
-        return totalAlertas.get();
+    public synchronized int getTotalAlertas() {
+        return totalAlertas;
     }
 }
